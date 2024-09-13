@@ -1,2 +1,6 @@
 ijaset_formatted
 .idea
+.venv4
+__pycache__
+pythonCompressed
+*.swp

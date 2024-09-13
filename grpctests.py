@@ -5,13 +5,23 @@ from google.protobuf import field_mask_pb2
 import chardet
 
 
-import os
 def run():
-    # Create a gRPC channel to the server
-    channel = grpc.insecure_channel('localhost:50091')  # Replace with your server address
+    channel = grpc.insecure_channel('localhost:50091')
 
-    # Create a stub (client)
     stub = swhgraph_pb2_grpc.TraversalServiceStub(channel)
+
+    """
+    def request_children(swhid: str):
+        return swhid_to_node(swhid).successor
+
+    def swhid_to_node(swhid: str):
+        requestNode = swhgraph_pb2.GetNodeRequest(
+            swhid=swhid
+        )
+        responseNode = stub.GetNode(requestNode)
+        return responseNode
+    """
+
     with open('./pythonCompressed/origins.txt', 'r') as infile:
         all_origins = []
         for line in infile:
@@ -25,11 +35,24 @@ def run():
         return_nodes=swhgraph_pb2.NodeFilter(types="rev"),
         #mask=field_mask_pb2.FieldMask()#paths=["rev.message"]),  # Only return the message field
     )
-
-    # Make the gRPC call
+    """
+    child1 = request_children(all_origins[1])[0].swhid
+    print("child 1:   " + child1)
+    child2 = request_children(child1)[0].swhid
+    print("child 2:   " + child2)
+    print(swhid_to_node(child2).rev)
+    child3 = request_children(child2)[0].swhid
+    print("child 3:   " + child3)
+    print(request_children(child1))
+    print("________________________")
+    print(request_children(child2))
+    print("________________________")
+    #print(request_children(child3))
+    print("________________________")
+    return
+    """
     response_iterator = stub.Traverse(request)
 
-    # Filter commit messages containing the word 'hello'
     i = 0
     for node in response_iterator:
         try:

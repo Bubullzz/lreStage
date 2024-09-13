@@ -12,12 +12,14 @@ import pickle
 import sys
 import os
 
+
 # This function is adapted from:
 #   https://github.com/mattilyra/LSH/blob/master/examples/Introduction.ipynb
 def shingles(text, char_ngram=5):
     result = set(text[head:head + char_ngram]
                for head in range(0, len(text) - char_ngram))
     return result
+
 
 
 # This function is adapted from:
@@ -35,6 +37,7 @@ def jaccard(set_a, set_b, args):
         return len(intersection) / max(len(set_a), len(set_b))
     else:
         return len(intersection) / len(union)
+
 
 def compute_fingerprint(line, key):
     try:
