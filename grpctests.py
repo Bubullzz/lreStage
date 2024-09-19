@@ -3,7 +3,7 @@ import swhgraph_pb2
 import swhgraph_pb2_grpc
 from google.protobuf import field_mask_pb2
 import chardet
-
+import sys
 
 def run():
     channel = grpc.insecure_channel('localhost:50091')
@@ -22,7 +22,7 @@ def run():
         return responseNode
     """
 
-    with open('./pythonCompressed/origins.txt', 'r') as infile:
+    with open(sys.argv[1], 'r') as infile:
         all_origins = []
         for line in infile:
             all_origins.append(line[:-1])
