@@ -6,7 +6,7 @@ use swh_graph::NodeType;
 fn main()
 {
     println!("starting program");
-    let basename = PathBuf::from("../pythonCompressed/graph");
+    let basename = PathBuf::from("/work/rayan.mostovoi/historyMachin/graph");
 
     println!("loading graph... this might take A WHILE (20 minutes for le petit teaser python)");
     let graph = swh_graph::graph::load_full::<swh_graph::mph::DynMphf>(basename)
@@ -20,6 +20,6 @@ fn main()
 
     for node in origin_nodes {
         let swhid = graph.properties().swhid(node);
-        println!("Origin node SWHID: {}", swhid);
+        println!("{}", swhid);
     }
 }
