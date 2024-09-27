@@ -18,9 +18,5 @@ def run():
         for line in infile:
             all_origins.append(line[:-1])
 
-    chek_if_traverse_gives_duplicates(stub, all_origins, True)
-    #how_many_snp_per_origin(stub, all_origins)
-    #time_between_snapshots(stub, all_origins)
-
 if __name__ == '__main__':
     run()

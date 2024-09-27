@@ -2,21 +2,23 @@ import chardet
 import sys
 import tqdm
 import grpc
+import math
 import swhgraph_pb2
 import swhgraph_pb2_grpc
 from google.protobuf import field_mask_pb2
 
-def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD):
+def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=math.inf):
     return swhgraph_pb2.TraversalRequest(
             src=src,
             direction=direction,
             edges=edges,
-            return_nodes=swhgraph_pb2.NodeFilter(types=types),
+            return_nodes=swhgraph_pb2.NodeFilter(types=types)
+            #max_depth=max_depth
         )
 
 # Calling SWH Traversal function, but doing it in a more cute way :)
-def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD):
-    req = build_traversal_request(src,edges,types, direction)
+def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=math.inf):
+    req = build_traversal_request(src,edges,types, direction, max_depth)
     return list(stub.Traverse(req))
 
 def get_node(stub, swhid):
@@ -105,7 +107,7 @@ def same_commit_diff_snp_diff_url(stub, all_origins):
         if (len(unique_ori) > 1):
             print("found")
 
-def snapshots(stub, all_origins, max_depth=1):
+def snapshots(stub, all_origins, only_ids=False, max_depth=1):
     get_all_snapshots = swhgraph_pb2.TraversalRequest(
         src=all_origins,
         direction=swhgraph_pb2.GraphDirection.FORWARD,
@@ -114,4 +116,4 @@ def snapshots(stub, all_origins, max_depth=1):
         max_depth=max_depth
     )
     all_snp = stub.Traverse(get_all_snapshots)
-    return list(all_snp)
+    return [snp.swhid for snp in all_snp] if only_ids else list(all_snp)
