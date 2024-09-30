@@ -4,9 +4,11 @@ import tqdm
 import grpc
 import math
 import datetime
+import heapq
 import swhgraph_pb2
 import swhgraph_pb2_grpc
 from google.protobuf import field_mask_pb2
+
 from utils import *
 
 # Function to check how the breadth-first search manages duplicates (does a swhid appears multiple times if multiple orgins point to it ?)
@@ -111,26 +113,42 @@ def weird_behavior(stub):
     print(f"The given node has {len(nodes)} origins")
     return urls
 
-def same_commit_different_origin(stub, all_origins):
-    latest_rev_per_origin = []
+def same_root_different_origin(stub, all_origins, depth=1, directories=False):
+    tot = 0
     for origin in tqdm.tqdm(all_origins):
         snps = my_traverse(stub,[origin], "ori:snp", "snp") # all snp from this ori
         snps = [snp.swhid for snp in snps]
-        latest_time = -math.inf
-        latest_rev_swhid = ""
+        latest_revs = []
+        heapq.heapify(latest_revs)
         revs = my_traverse(stub, snps, "snp:rev", "rev") # all rev from this ori (might be faster but is ok)
+
         for rev in revs:
-            if latest_time < rev.rev.author_date:
-                latest_time = rev.rev.author_date
-                latest_rev_swhid = rev.swhid
-        if latest_rev_swhid != "" :
-            latest_rev_per_origin.append(latest_rev_swhid)
-    for rev in tqdm.tqdm(latest_rev_per_origin):
-        oris = my_traverse(stub, [rev], "*", "ori", swhgraph_pb2.GraphDirection.BACKWARD) # When working on the bigger graph we might encounter snp with multi-origins, this level of precision will not be enough
-        if len(oris) > 1 :
-            print("+------------------------+")
-            print("found multiple origins on one commit : " + rev)
-            for ori in oris:
-                print(ori.ori.url + " : " + ori.swhid)
+            heapq.heappush(latest_revs, (rev.rev.author_date, rev.swhid)) # date first bc heapify uses tuple[0]
+            if len(latest_revs) > depth:
+                str(heapq.heappop(latest_revs)[0])
+        latest_revs = sorted(latest_revs, reverse=True)
+        for rev in latest_revs:
+            src = [rev[1]] # keeping the id
+            if directories: # instead we use the revision root dir as src
+                src = my_traverse(stub, src, "rev:dir", "dir")
+                src = [s.swhid for s in src]
+            oris = my_traverse(stub, src, "*", "ori",
+                               swhgraph_pb2.GraphDirection.BACKWARD)  # When working on the bigger graph we might encounter snp with multi-origins, this level of precision will not be enough
+            if len(oris) > 1:
+                print("+------------------------+")
+                print("origin : " + origin)
+                print("found multiple origins on one source : " + src[0])
+                r = stub.GetNode(swhgraph_pb2.GetNodeRequest(swhid=rev[1]))
+                print("revision id : " + rev[1])
+                print("message : " + str(r.rev.message))
+                print("at time : "+ datetime.datetime.fromtimestamp(r.rev.author_date).strftime('%Y-%m-%d %H:%M:%S'))
+                for ori in oris:
+                    print(ori.ori.url + " : " + ori.swhid)
+                print()
+                tot += 1
+                break
+    print(f"found {tot} migrations")
+    return tot
+
 
 

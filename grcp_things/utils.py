@@ -3,21 +3,24 @@ import sys
 import tqdm
 import grpc
 import math
+import datetime
+import hashlib
 import swhgraph_pb2
+import requests
 import swhgraph_pb2_grpc
 from google.protobuf import field_mask_pb2
 
-def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=math.inf):
+def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None):
     return swhgraph_pb2.TraversalRequest(
             src=src,
             direction=direction,
             edges=edges,
-            return_nodes=swhgraph_pb2.NodeFilter(types=types)
-            #max_depth=max_depth
+            return_nodes=swhgraph_pb2.NodeFilter(types=types),
+            max_depth=max_depth
         )
 
 # Calling SWH Traversal function, but doing it in a more cute way :)
-def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=math.inf):
+def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None):
     req = build_traversal_request(src,edges,types, direction, max_depth)
     return list(stub.Traverse(req))
 
@@ -51,6 +54,8 @@ def get_migrations(stub, all_origins):
             for ori in multi_origins:
                 print(ori.ori.url)
 
+def pretty_print_date(date):
+    print(datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S'))
 def get_word(stub, all_origins, word):
     request = swhgraph_pb2.TraversalRequest(
         src=all_origins,

@@ -61,4 +61,8 @@ WORKDIR "/home/swh-graph"
 RUN cargo build --release --bin swh-graph-grpc-serve
 
 RUN . /home/.venv/bin/activate && \
-    pip install awscli
+    pip install awscli && \
+    pip install heapq && \
+    pip install pandas && \
+    pip install boto3 pyarrow
+
