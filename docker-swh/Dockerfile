@@ -1,4 +1,4 @@
-FROM debian
+FROM debian:bookworm
 
 # Set environment variables for non-interactive installations
 ENV DEBIAN_FRONTEND=noninteractive
@@ -40,11 +40,9 @@ RUN RUSTFLAGS="-C target-cpu=native" cargo install --git https://gitlab.software
 RUN python3 -m venv .venv
 
 RUN . .venv/bin/activate && \
-    pip install psycopg2-binary && \
-    pip install google && \
-    pip install grpcio && \
-    pip install chardet
-
+    pip install psycopg2-binary google grpcio chardet awscli pandas boto3 pyarrow \
+    datatrove tokenizers xxhash orjson nltk \
+    transformers datasketch datasets typer wheel torch chromadb
 
 # Clone the repository and build the Rust project
 RUN . .venv/bin/activate && \
@@ -56,13 +54,21 @@ RUN . .venv/bin/activate && \
 # Install swh-graph
 RUN cargo install swh-graph
 
-
 WORKDIR "/home/swh-graph"
 RUN cargo build --release --bin swh-graph-grpc-serve
 
-RUN . /home/.venv/bin/activate && \
-    pip install awscli && \
-    pip install heapq && \
-    pip install pandas && \
-    pip install boto3 pyarrow
+WORKDIR /home/
 
+RUN . .venv/bin/activate && \
+    git clone https://github.com/ASUS-AICS/LSH.git && \
+    cd LSH && \
+    pip install Cython && \
+    python setup.py install
+
+RUN . .venv/bin/activate && \
+    python -c "import nltk; nltk.download('punkt_tab')"
+
+RUN echo "alias sv='source /home/.venv/bin/activate'" >> ~/.bashrc
+
+RUN . .venv/bin/activate && \
+    pip install accelerate termcolor

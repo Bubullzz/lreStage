@@ -10,19 +10,23 @@ import requests
 import swhgraph_pb2_grpc
 from google.protobuf import field_mask_pb2
 
-def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None):
+def build_traversal_request(src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None, max_matching_nodes=None):
     return swhgraph_pb2.TraversalRequest(
             src=src,
             direction=direction,
             edges=edges,
             return_nodes=swhgraph_pb2.NodeFilter(types=types),
-            max_depth=max_depth
+            max_depth=max_depth,
+            max_matching_nodes=max_matching_nodes
         )
 
+def my_traverse_it(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None, max_matching_nodes=None):
+    req = build_traversal_request(src,edges,types, direction, max_depth, max_matching_nodes)
+    return stub.Traverse(req)
+
 # Calling SWH Traversal function, but doing it in a more cute way :)
-def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None):
-    req = build_traversal_request(src,edges,types, direction, max_depth)
-    return list(stub.Traverse(req))
+def my_traverse(stub, src, edges="*", types="*", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None, max_matching_nodes=None):
+    return list(my_traverse_it(stub, src, edges, types, direction, max_depth, max_matching_nodes))
 
 def get_node(stub, swhid):
     req = swhgraph_pb2.GetNodeRequest(
@@ -30,87 +34,20 @@ def get_node(stub, swhid):
         )
     return stub.GetNode(req)
 
-def get_migrations(stub, all_origins):
-    down_stream_request = swhgraph_pb2.TraversalRequest(
-        src=all_origins,
-        direction=swhgraph_pb2.GraphDirection.FORWARD,
-        edges="ori:*,snp:*",
-        return_nodes=swhgraph_pb2.NodeFilter(types="rev"),
-    )
-    down_stream_iterator = stub.Traverse(down_stream_request)
-    for revision in down_stream_iterator:
-        up_stream_request = swhgraph_pb2.TraversalRequest(
-            src=[revision.swhid],
-            direction=swhgraph_pb2.GraphDirection.BACKWARD,
-            edges="rev:rev,rev:snp,snp:ori",
-            return_nodes=swhgraph_pb2.NodeFilter(types="ori"),
-        )
-        up_stream_iterator = stub.Traverse(up_stream_request)
-        multi_origins = []
-        for origin in up_stream_iterator:
-            multi_origins.append(origin)
-        if len(multi_origins) > 1:
-            print("found migration ??")
-            for ori in multi_origins:
-                print(ori.ori.url)
-
 def pretty_print_date(date):
     print(datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S'))
-def get_word(stub, all_origins, word):
-    request = swhgraph_pb2.TraversalRequest(
-        src=all_origins,
-        direction=swhgraph_pb2.GraphDirection.FORWARD,
-        edges="*",
-        return_nodes=swhgraph_pb2.NodeFilter(types="rev"),
-    )
-    response_iterator = stub.Traverse(request)
 
-    i = 0
-    for node in tqdm.tqdm(response_iterator):
+def get_word(stub, all_origins, word):
+    response_iterator = my_traverse_it(stub,all_origins,types="rev")
+    for node in response_iterator:
         try:
-            """
-            i += 1
-            if i % 10000 == 0:
-                print(i)
-            """
             if word in node.rev.message.decode('utf-8'):
                 print(node.rev.message.decode('utf-8').replace(word, f'\033[92m{word}\033[0m'))
                 print('---')
-
         except UnicodeDecodeError:
             print("error decoding: ", end='')
             print(node.rev.message)
 
-# PAS FINIT
-def same_commit_diff_snp_diff_url(stub, all_origins):
-    get_all_first_commits_request = swhgraph_pb2.TraversalRequest(
-        src=all_origins,
-        direction=swhgraph_pb2.GraphDirection.FORWARD,
-        edges="ori:*,snp:*",
-        return_nodes=swhgraph_pb2.NodeFilter(types="rev"),
-    )
-    all_first_commits = stub.Traverse(get_all_first_commits_request)
-    for commit in all_first_commits:
-        snapshots_requests = swhgraph_pb2.TraversalRequest(
-            src=[commit.swhid],
-            direction=swhgraph_pb2.GraphDirection.BACKWARD,
-            edges="rev:rev,rev:snp", #voir si des "snp:snp" existent
-            return_nodes=swhgraph_pb2.NodeFilter(types="snp"),
-        )
-        snapshots = stub.Traverse(snapshots_requests)
-        unique_ori = {}
-        for snap in snapshots:
-            if snap.num_successors == 1:
-                origin_requests = swhgraph_pb2.TraversalRequest(
-                    src=[snap.swhid],
-                    direction=swhgraph_pb2.GraphDirection.BACKWARD,
-                    edges="snp:ori",
-                    return_nodes=swhgraph_pb2.NodeFilter(types="ori"),
-                )
-                for ori in stub.Traverse(origin_requests):
-                    unique_ori.append(ori.swhid)
-        if (len(unique_ori) > 1):
-            print("found")
 
 def snapshots(stub, all_origins, only_ids=False, max_depth=1):
     get_all_snapshots = swhgraph_pb2.TraversalRequest(

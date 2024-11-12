@@ -4,3 +4,4 @@ ijaset_formatted
 __pycache__
 pythonCompressed
 *.swp
+rev2rev_dataset*

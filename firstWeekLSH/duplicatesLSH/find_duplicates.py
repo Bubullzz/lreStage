@@ -11,7 +11,9 @@ import time
 import pickle
 import sys
 import os
-
+import requests
+import gzip
+import io
 
 # This function is adapted from:
 #   https://github.com/mattilyra/LSH/blob/master/examples/Introduction.ipynb
@@ -19,8 +21,6 @@ def shingles(text, char_ngram=5):
     result = set(text[head:head + char_ngram]
                for head in range(0, len(text) - char_ngram))
     return result
-
-
 
 # This function is adapted from:
 #  https://github.com/mattilyra/LSH/blob/master/examples/Introduction.ipynb
@@ -39,17 +39,29 @@ def jaccard(set_a, set_b, args):
         return len(intersection) / len(union)
 
 
+def get_file_content(text):
+    response = requests.get(text)
+    if response.status_code == 200:
+        file_content = response.content
+        with gzip.GzipFile(fileobj=io.BytesIO(file_content)) as gz:
+            decompressed_content = gz.read()
+        return decompressed_content.decode('utf-8')
+    else:
+        #print(f"Failed to download file. Status code: {response.status_code}")
+        return None
+
 def compute_fingerprint(line, key):
     try:
         myjson = json.loads(line)
         url = myjson[key]
-        text = myjson['text']
+        text = json.loads['text'] #get_file_content(myjson['text'])
+        if text is None:
+            return None, None, False
         fingerprint = hasher.fingerprint(text)
     except Exception as e:
-        print('Error:', e)
-        return None, None, None, False
-
-    return url, text, fingerprint, True
+        #print('Error:', e)
+        return None, None, False
+    return url, fingerprint, True
 
 def url_pairs_to_remove(args, bucket_urls, url_doc):
     remove_urls_list = []
@@ -220,7 +232,6 @@ if __name__ == '__main__':
     # initialize minhash and lsh cache
     hasher = minhash.MinHasher(seeds=seeds, char_ngram=5, hashbytes=4)
     lshcache = cache.Cache(num_bands=args.num_bands, hasher=hasher)
-
     url_doc = {}
 
     # load fingerprints from pickle file if needed
@@ -255,14 +266,14 @@ if __name__ == '__main__':
                 flush=True)
 
             # compute fingerprints in parallel
-            num_workers = 40
+            num_workers = 512
             pool = multiprocessing.Pool(num_workers)
             fin = open(input_file, 'r', encoding='utf-8')
             compute_fingerprint_partial = partial(compute_fingerprint, key=key)
             compute_fingerprint_iter = pool.imap(compute_fingerprint_partial,
                                                     fin, 512)
             # traverse all the texts and add fingerprints
-            for url, text, fingerprint, flag in compute_fingerprint_iter:
+            for url, fingerprint, flag in compute_fingerprint_iter:
                 counter += 1
                 if flag:
                     url_doc[url] = text
@@ -293,4 +304,30 @@ if __name__ == '__main__':
             find_pair_urls_sequential(args, lshcache, url_doc)
 
     print('done :-)')
+
+
+async def fetch_url(session, url):
+    try:
+        async with session.get(url, timeout=10) as response:
+            if response.status == 200:
+                content = await response.read()  # Get content
+                return hashlib.sha256(content).hexdigest()  # Apply hash and return
+            else:
+                return None  # Handle non-200 responses as needed
+    except Exception as e:
+        return None  # Handle exceptions like connection. errors
+
+
+# Function to run multiple requests concurrently
+async def fetch_all_urls(urls, concurrency=1000):
+    # Limit the number of concurrent requests with a semaphore
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async with aiohttp.ClientSession() as session:
+        async def bounded_fetch(url):
+            async with semaphore:
+                return await fetch_url(session, url)
+
+        tasks = [bounded_fetch(url) for url in urls]
+        return await asyncio.gather(*tasks)  # Wait for all tasks to complet
  

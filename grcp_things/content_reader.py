@@ -6,7 +6,9 @@ import requests
 import gzip
 import io
 import pandas as pd
-
+import aiohttp
+import asyncio
+import random
 def sha_read_and_update(file_path, git_to_normal):
     try:
         with open(file_path, 'rb') as orc_file:
@@ -23,16 +25,74 @@ def sha_read_and_update(file_path, git_to_normal):
         print(f"Failed to read {file_path}: {e}")
         return None
 
-
-def sha1_git_to_sha1(directory_path, sha1_git_values):
-    git_to_normal = {v.split(':')[3]: '' for v in sha1_git_values} # only keeping the sha part, skipping cnt:1:....
+def get_orc_as_dict(directory_path):
+    db_dict = {}
     for root, dirs, files in os.walk(directory_path):
-        for file in tqdm.tqdm(files):
+        for file in tqdm.tqdm(files, desc="making database into a dict"):
             file_path = os.path.join(root, file)
-            sha_read_and_update(file_path, git_to_normal)
-            if '' not in git_to_normal.values(): # stop if we found all sha
-                break
-    return git_to_normal
+            with open(file_path, 'rb') as orc_file:
+                table = orc.ORCFile(orc_file).read(['sha1_git', 'sha1'])
+                df = table.to_pandas()
+                tmpDict = dict(zip(list(df['sha1_git']),list(df['sha1'])))
+                db_dict.update(tmpDict)
+    return db_dict
+
+def swhids_to_sha1(directory_path, swhids):
+    # takes a list of swhid as inputs
+    # returns swhid_to_sha1
+    db_dict = get_orc_as_dict(directory_path)
+    return {v: db_dict.get(v.split(':')[3], '') for v in swhids}
+
+async def async_get_file_content_with_retries(sha1, session: aiohttp.ClientSession, semaphore, retries=3):
+    try:
+        async with semaphore:  # Limit concurrent requests
+            timeout = aiohttp.ClientTimeout(total=3)
+            link = 'https://softwareheritage.s3.amazonaws.com/content/' + sha1
+            for attempt in range(retries):
+                try:
+                    async with session.get(link, timeout=timeout) as response:
+                        if response.status == 200:
+                            file_content = await response.read()  # Non-blocking read
+                            with gzip.GzipFile(fileobj=io.BytesIO(file_content)) as gz:
+                                decompressed_content = gz.read()
+                            return decompressed_content.decode('utf-8')
+                    break  # Exit retry loop if successful chatgpt a dit donc je laisse
+                except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                    if attempt < retries - 1:
+                        await asyncio.sleep(random.uniform(1, 3))  # Exponential backoff
+    except Exception as e:
+        return None
+    return None
+
+async def async_read_sha1(sha1_list, max_concurrent_requests=100, verbose=False):
+    semaphore = asyncio.Semaphore(max_concurrent_requests)  # Limit number of concurrent requests
+    async with aiohttp.ClientSession() as session:
+        tasks = {
+            s: asyncio.create_task(async_get_file_content_with_retries(s, session, semaphore)) 
+            for s in sha1_list
+        }
+        results = await asyncio.gather(*tasks.values())  # Await all tasks concurrently
+        sha1_to_content = {s: result for s, result in zip(tasks.keys(), results)}
+
+    print(f"Total errors encountered: {sum(1 for result in results if result is None)}")  # Print the error count at the end
+    return sha1_to_content
+    
+
+def sha1list_to_contents(sha1_list):
+    # sha1 : a list of sha1
+    return asyncio.run(async_read_sha1(sha1_list))
+
+def swhids_to_contents(orc_path, swhids):
+    # orc_path : where is the sha_git_to_sha stored
+    # swhids : list of swhids
+    # careful, this function can put values as None
+    swhids_to_sha1_res = swhids_to_sha1(orc_path, swhids)
+    sha1list_to_content_res = sha1list_to_contents(swhids_to_sha1_res.values())
+    return {swhid: sha1list_to_content_res[swhids_to_sha1_res[swhid]]
+            for swhid in swhids
+            }
+
+
 
 def get_file_content(sha):
     try:

@@ -183,9 +183,8 @@ message NodeFilter {
     /* Node restriction string. (e.g. "dir,cnt,rev"). Defaults to "*" (all). */
     optional string types = 1;
     /* Minimum number of successors encountered *during the traversal*.
-     * Default: no constraint */ctests.py", line 25, in run
-    for node in response_iterator:
-    */
+     * Default: no constraint */
+}
 message Node {
     /* The SWHID of the graph node. */
     string swhid = 1;

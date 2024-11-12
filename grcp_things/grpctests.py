@@ -7,6 +7,7 @@ import tqdm
 from utils import *
 from property_checkers import *
 from content_reader import *
+from dataset_maker import *
 
 def run():
     channel = grpc.insecure_channel('localhost:50091')
@@ -18,19 +19,25 @@ def run():
         for line in infile:
             all_origins.append(line[:-1])
 
-    dir_id = ["swh:1:dir:870c98922867e3a35874e2caf0a5d1766002a4e2"]
+    dataset_maker(stub, all_origins[9:])
+    
 
-    revs = my_traverse(stub, dir_id, "*", "cnt", direction=swhgraph_pb2.GraphDirection.FORWARD, max_depth=None)
-
-    ids = [r.swhid for r in revs]
-    directory_path = '/work/PythonOrc/content/'
-    sha1 = sha1_git_to_sha1(directory_path, ids)
-    print(sha1)
-    return
-    for s in sha1:
-        print("+-------------------------------------------------------------------------------------------+")
-        print(get_file_content(s))
 
 
 if __name__ == '__main__':
+    run()
+    exit(0)
+    db_dict = {}
+    directory_path = '/masto/2024-05-16/ORC'
+    for root, dirs, files in os.walk(directory_path):
+        for file in tqdm.tqdm(files, desc="visiting files"):
+            file_path = os.path.join(root, file)
+            with open(file_path, 'rb') as orc_file:
+                table = orc.ORCFile(orc_file).read()
+                df = table.to_pandas()
+                print(df)
+                print(df.columns)
+                tmpDict = dict(zip(list(df['sha1_git']),list(df['sha1'])))
+                db_dict.update(tmpDict)
+    exit(0)
     run()

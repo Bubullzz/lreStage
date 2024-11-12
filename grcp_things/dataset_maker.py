@@ -25,8 +25,44 @@ def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension=['c', 'cc
                 name_to_swhid[name].add(succ.swhid)
             rec_get_files(stub, succ.swhid, name_to_swhid, name, visited, extension) 
 
+def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension=['c', 'cc', 'py']):
+    if swhid in visited: # Already visited this node
+        return
+    visited.add(swhid)
+    if any(path.split('.')[-1] == ext for ext in extension): # enough to check it we are on a cnt node
+        name_to_swhid.setdefault(path, set()) # if not exist initialize empty set, then append swhid
+        name_to_swhid[path].add(swhid)
+        return 
+    
+    node = stub.GetNode(swhgraph_pb2.GetNodeRequest(swhid=swhid))
+    for succ in node.successor:
+        if len(succ.label) != 0:
+            label = succ.label[0] # Only taking the first edge as the graph can be multi edge 
+            name = label.name.decode('utf-8')
+            new_path = f"{path}/{name}"
+            rec_get_files(stub, succ.swhid, name_to_swhid, new_path, visited, extension) 
 
-def dataset_maker(stub, all_origins, dataset_size=5, depth=2):
+
+def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev_dataset_V3'):
+    """
+    Generates a dataset of files with multiple versions from a set of origins.
+    This function traverses through a set of origins to collect files and their versions,
+    filters out files with only one version, and saves the remaining files with multiple
+    versions into a specified directory.
+    Args:
+        stub: The gRPC stub used for making remote procedure calls.
+        all_origins (list): A list of origin identifiers to start the traversal.
+        dataset_size (int, optional): Not used for the moment
+        depth (int, optional): The maximum number of revisions we go between. Will probably bug if > 2
+    Returns:
+        dict: A dictionary where keys are file names and values are lists of file contents
+              for each version.
+    Notes:
+        - The function uses a heap to keep track of the latest versions of files.
+        - Files with only one version are removed from the final dataset.
+        - The resulting dataset is saved in the out_dir
+    """
+
     name_to_swhid = {} # linking each file name to all it's versions in the subset of selected revs. Might need to add a more comprehensive time ranking of the version later
     visited = set()
     iteration = 0
@@ -65,21 +101,15 @@ def dataset_maker(stub, all_origins, dataset_size=5, depth=2):
                                if swhids_to_contents_res[swhid] != None]
                         for name
                         in name_to_swhid.keys()}
-    print(f"after removing Nones : {len(name_to_swhid)}")
     
     # remove all files with only one version after losses from http request
     name_to_contents = {name:contents for name,contents in name_to_contents.items() if len(contents) > 1}
+    print(f"after removing Nones : {len(name_to_contents)}")
 
-    dir = './rev2rev_dataset_V2'
     for i, (name, contents) in enumerate(name_to_contents.items()):
-        path = os.path.join(dir,f"set_{i}")
+        path = os.path.join(out_dir,f"set_{i}")
         os.mkdir(path)
         for j, cnt in enumerate(contents):
             with open(os.path.join(path,f"V_{j}"), 'w') as file:
                 file.write(cnt)
     return name_to_contents
-
-
-
-if __name__ == '__main__':
-    run()
