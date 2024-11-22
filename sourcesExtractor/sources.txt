@@ -1,2 +1,0 @@
-starting program
-loading graph... this might take A WHILE (20 minutes for le petit teaser python)

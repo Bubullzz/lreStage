@@ -5,3 +5,5 @@ __pycache__
 pythonCompressed
 *.swp
 rev2rev_dataset*
+sourcesExtractor
+!sourcesExtractor/src/main.rs
