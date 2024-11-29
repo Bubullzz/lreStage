@@ -5,5 +5,7 @@ __pycache__
 pythonCompressed
 *.swp
 rev2rev_dataset*
-sourcesExtractor
+sourcesExtractor/*
 !sourcesExtractor/src/main.rs
+!sourcesExtractor/Cargo.toml
+
