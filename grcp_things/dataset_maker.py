@@ -10,6 +10,33 @@ from content_reader import *
 from google.protobuf.json_format import MessageToDict
 
 
+def meake_full_dataset(stub, path):
+    with open(path, 'r') as infile:
+        all_origins = []
+        i = 0
+        for line in tqdm.tqdm(infile, total=295060682):
+            all_origins.append(line[:-1])
+            i += 1
+            #if i == 1000:
+                
+
+    target = 131072
+    batch_size = 2048
+    start = 0
+    ext = [
+        'c', 'cc', 'py', 'cpp', 'java', 'js', 'ts', 'cs', 'go', 'rb', 'php', 
+        'swift', 'kt', 'rs', 'sh', 'lua', 'r', 'scala', 'hs'
+        ]
+
+    for i in range(0, len(all_origins), batch_size):
+        start = dataset_maker(stub, all_origins[i:i+batch_size], start_index=start, extension=ext, out_dir='./rev2rev_dataset_100K')
+        print(start, '/', target)
+        if start >= target:
+            break
+
+    #dataset_maker(stub, all_origins[10:10+64])
+
+
 def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension):
     if swhid in visited: # Already visited this node
         return
