@@ -31,16 +31,15 @@ def get_orc_as_dict(directory_path):
         for file in tqdm.tqdm(files, desc="making database into a dict"):
             file_path = os.path.join(root, file)
             with open(file_path, 'rb') as orc_file:
-                table = orc.ORCFile(orc_file).read(['sha1_git', 'sha1'])
-                df = table.to_pandas()
-                tmpDict = dict(zip(list(df['sha1_git']),list(df['sha1'])))
-                db_dict.update(tmpDict)
+                df = orc.ORCFile(orc_file).read(['sha1_git', 'sha1']).to_pandas()
+                db_dict.update(dict(zip(list(df['sha1_git']),list(df['sha1']))))
     return db_dict
 
-def swhids_to_sha1(directory_path, swhids):
+def swhids_to_sha1(directory_path, swhids, db_dict):
     # takes a list of swhid as inputs
     # returns swhid_to_sha1
-    db_dict = get_orc_as_dict(directory_path)
+    if db_dict is None:
+        db_dict = get_orc_as_dict(directory_path)
     return {v: db_dict.get(v.split(':')[3], '') for v in swhids}
 
 async def async_get_file_content_with_retries(sha1, session: aiohttp.ClientSession, semaphore, retries=3):
@@ -82,11 +81,11 @@ def sha1list_to_contents(sha1_list):
     # sha1 : a list of sha1
     return asyncio.run(async_read_sha1(sha1_list))
 
-def swhids_to_contents(orc_path, swhids):
+def swhids_to_contents(orc_path, swhids, db_dict=None):
     # orc_path : where is the sha_git_to_sha stored
     # swhids : list of swhids
     # careful, this function can put values as None
-    swhids_to_sha1_res = swhids_to_sha1(orc_path, swhids)
+    swhids_to_sha1_res = swhids_to_sha1(orc_path, swhids, db_dict)
     sha1list_to_content_res = sha1list_to_contents(swhids_to_sha1_res.values())
     return {swhid: sha1list_to_content_res[swhids_to_sha1_res[swhid]]
             for swhid in swhids

@@ -8,4 +8,5 @@ rev2rev_dataset*
 sourcesExtractor/*
 !sourcesExtractor/src/main.rs
 !sourcesExtractor/Cargo.toml
+*.txt
 

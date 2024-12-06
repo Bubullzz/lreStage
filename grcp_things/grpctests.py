@@ -16,28 +16,32 @@ def run():
 
     with open(sys.argv[1], 'r') as infile:
         all_origins = []
-        for line in infile:
+        i = 0
+        for line in tqdm.tqdm(infile, total=295060682):
             all_origins.append(line[:-1])
+            i += 1
+            #if i == 1000:
+                
 
-    dataset_maker(stub, all_origins[9:])
+    target = 131072
+    batch_size = 2048
+    start = 0
+    ext = [
+        'c', 'cc', 'py', 'cpp', 'java', 'js', 'ts', 'cs', 'go', 'rb', 'php', 
+        'swift', 'kt', 'rs', 'sh', 'lua', 'r', 'scala', 'hs'
+        ]
+
+    for i in range(0, len(all_origins), batch_size):
+        start = dataset_maker(stub, all_origins[i:i+batch_size], start_index=start, extension=ext, out_dir='./rev2rev_dataset_100K')
+        print(start, '/', target)
+        if start >= target:
+            break
+
+    #dataset_maker(stub, all_origins[10:10+64])
     
 
 
 
 if __name__ == '__main__':
     run()
-    exit(0)
-    db_dict = {}
-    directory_path = '/masto/2024-05-16/ORC'
-    for root, dirs, files in os.walk(directory_path):
-        for file in tqdm.tqdm(files, desc="visiting files"):
-            file_path = os.path.join(root, file)
-            with open(file_path, 'rb') as orc_file:
-                table = orc.ORCFile(orc_file).read()
-                df = table.to_pandas()
-                print(df)
-                print(df.columns)
-                tmpDict = dict(zip(list(df['sha1_git']),list(df['sha1'])))
-                db_dict.update(tmpDict)
-    exit(0)
-    run()
+

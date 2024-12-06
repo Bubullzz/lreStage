@@ -10,22 +10,7 @@ from content_reader import *
 from google.protobuf.json_format import MessageToDict
 
 
-def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension=['c', 'cc', 'py']):
-    node = stub.GetNode(swhgraph_pb2.GetNodeRequest(swhid=swhid))
-    for succ in node.successor:
-        if succ.swhid in visited: # Already visited this node
-            return
-        visited.add(swhid)
-        if len(succ.label) != 0:
-            label = succ.label[0] # Only taking the first edge as the graph can be multi edge 
-            name = label.name.decode('utf-8')
-            name = f"{path}/{name}"
-            if any(name.split('.')[-1] == ext for ext in extension):
-                name_to_swhid.setdefault(name, set()) # if not exist initialize empty set, then append swhid
-                name_to_swhid[name].add(succ.swhid)
-            rec_get_files(stub, succ.swhid, name_to_swhid, name, visited, extension) 
-
-def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension=['c', 'cc', 'py']):
+def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension):
     if swhid in visited: # Already visited this node
         return
     visited.add(swhid)
@@ -37,13 +22,16 @@ def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension=['c', 'cc
     node = stub.GetNode(swhgraph_pb2.GetNodeRequest(swhid=swhid))
     for succ in node.successor:
         if len(succ.label) != 0:
-            label = succ.label[0] # Only taking the first edge as the graph can be multi edge 
-            name = label.name.decode('utf-8')
+            label = succ.label[0] # Only taking the first edge as the graph can be multi edge
+            try:
+                name = label.name.decode('utf-8')
+            except:
+                return
             new_path = f"{path}/{name}"
             rec_get_files(stub, succ.swhid, name_to_swhid, new_path, visited, extension) 
 
 
-def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev_dataset_V3'):
+def dataset_maker(stub, all_origins, start_index=0, depth=2, extension=['c', 'cc', 'py'], out_dir='./rev2rev_dataset_V3'):
     """
     Generates a dataset of files with multiple versions from a set of origins.
     This function traverses through a set of origins to collect files and their versions,
@@ -55,8 +43,7 @@ def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev
         dataset_size (int, optional): Not used for the moment
         depth (int, optional): The maximum number of revisions we go between. Will probably bug if > 2
     Returns:
-        dict: A dictionary where keys are file names and values are lists of file contents
-              for each version.
+        int: the number of pairs created from this list of origins
     Notes:
         - The function uses a heap to keep track of the latest versions of files.
         - Files with only one version are removed from the final dataset.
@@ -80,9 +67,12 @@ def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev
         latest_revs = sorted(latest_revs, reverse=True)
         for rev in latest_revs:
             swhid = rev[1]
-            root_dir = my_traverse(stub, [swhid], "rev:dir", "dir")[0]
+            root_dir = my_traverse(stub, [swhid], "rev:dir", "dir")
+            if len(root_dir) == 0:
+                continue
+            root_dir = root_dir[0]
             swhid = root_dir.swhid
-            rec_get_files(stub, swhid, name_to_swhid, f"{iteration}", visited)
+            rec_get_files(stub, swhid, name_to_swhid, f"{iteration}", visited, extension)
         iteration += 1
 
 
@@ -93,9 +83,9 @@ def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev
     print(f"after keeping only multi-version files: {len(name_to_swhid)}")
     
     all_swhids = [swhid for swhids_set in name_to_swhid.values() for swhid in swhids_set]
-    print(len(all_swhids), len(set(all_swhids)))
-    directory_path = '/work/PythonOrc/content/'
-    swhids_to_contents_res = swhids_to_contents(directory_path, all_swhids)
+    directory_path = '/masto/rayan.mostovoi/2024-05-16/ORC/content/'
+    db_dict = get_orc_as_dict(directory_path)
+    swhids_to_contents_res = swhids_to_contents(directory_path, all_swhids, db_dict=db_dict)
 
     name_to_contents = {name: [swhids_to_contents_res[swhid] for swhid in name_to_swhid[name] 
                                if swhids_to_contents_res[swhid] != None]
@@ -106,10 +96,14 @@ def dataset_maker(stub, all_origins, dataset_size=5, depth=2, out_dir='./rev2rev
     name_to_contents = {name:contents for name,contents in name_to_contents.items() if len(contents) > 1}
     print(f"after removing Nones : {len(name_to_contents)}")
 
-    for i, (name, contents) in enumerate(name_to_contents.items()):
+    i = start_index
+    for name, contents in name_to_contents.items():
         path = os.path.join(out_dir,f"set_{i}")
         os.mkdir(path)
         for j, cnt in enumerate(contents):
             with open(os.path.join(path,f"V_{j}"), 'w') as file:
                 file.write(cnt)
-    return name_to_contents
+        with open(os.path.join(path,"info.txt"), 'w') as file:
+            file.write(name)
+        i += 1
+    return i
