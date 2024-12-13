@@ -14,7 +14,7 @@ def run():
 
     stub = swhgraph_pb2_grpc.TraversalServiceStub(channel)
 
-     l = []
+    l = []
     with open(sys.argv[1], 'r') as infile:
         for line in infile:
             l.append((line.split(': ')[0],line.split(': ')[1][:-1]))
@@ -22,46 +22,54 @@ def run():
     no_snp = []
     no_rev = []
     no_dir = []
-    url_to_origins_1_rev = []
-    for swhid, url in tqdm.tqdm(l):
-        oris = find_migration(stub, swhid, 1, False, no_snp, no_rev, no_dir)
-        url_to_origins_1_rev.append((url, oris))
+
+    depths = [1,3]
+    depths_dir_combinations = [(depth, dir) for depth in depths for dir in [False, True]]
+
+    url_to_run_to_migrations = {url:
+                                    {depth_dir_tuple : None}
+                                    for url in [url for swhid, url in l]
+                                    for depth_dir_tuple in depths_dir_combinations
+                                } 
+
+    for depth in depths:
+        for dir in [False, True]:
+            for swhid, url in tqdm.tqdm(l):
+                oris = find_migration(stub, swhid, url, depth, dir, no_snp, no_rev, no_dir)
+                url_to_run_to_migrations[url][(depth, dir)] = oris
+
+
+
+
+    urls_1_rev = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(1, False)]) > 1]
+    urls_3_rev = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(3, False)]) > 1]
+    urls_1_dir = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(1, True)]) > 1]
+    urls_3_dir = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(3, True)]) > 1]
+
+    for x in [urls_1_rev, urls_3_rev, urls_1_dir, urls_3_dir]:
+        print(len(x))
     
-    url_to_origins_3_rev = []
-    for swhid, url in tqdm.tqdm(l):
-        oris = find_migration(stub, swhid, 3, False, no_snp, no_rev, no_dir)
-        url_to_origins_3_rev.append((url, oris))
-    url_to_origins_1_dir = []
-    for swhid, url in tqdm.tqdm(l):
-        oris = find_migration(stub, swhid, 1, True, no_snp, no_rev, no_dir)
-        url_to_origins_1_dir.append((url, oris))
-    url_to_origins_3_dir = []
-    for swhid, url in tqdm.tqdm(l):
-        oris = find_migration(stub, swhid, 3, True, no_snp, no_rev, no_dir)
-        url_to_origins_3_dir.append((url, oris))
+    exc_3_rev = [url for url in urls_3_rev if url not in urls_1_rev]
+    exc_1_dir = [url for url in urls_1_dir if url not in urls_1_rev]
+    exc_3_dir = [url for url in urls_3_dir if url not in exc_3_rev + exc_1_dir + urls_1_rev]
 
-    for url_to_origins in [url_to_origins_1_rev, url_to_origins_3_rev, url_to_origins_1_dir, url_to_origins_3_dir]:
-        ori_0_parent = [(url, oris) for url, oris in url_to_origins if len(oris) == 0]
-        ori_1_parent = [(url, oris) for url, oris in url_to_origins if len(oris) == 1]
-        ori_2_more_parent = [(url, oris) for url, oris in url_to_origins if len(oris) >= 2]
-        print("number of 0 origins :", len(ori_0_parent))
-        print("number of 1 origins :", len(ori_1_parent))
-        print("number of 2+ origins :", len(ori_2_more_parent))
-        print("no_snp :", len(no_snp))
-        print("no_rev :", len(no_rev))
-        print("no_dir :", len(no_dir))
 
-    ori_2_more_parent = sorted(ori_2_more_parent, key=lambda entry : len(entry[1]))
 
-    for url, oris in ori_2_more_parent:
-        swhid = [ori for ori, u in l if u == url][0]
-        print(url, ':', swhid)
-        for ori in oris:
-            print(' ' * 32, ori.ori.url)
-    
+    for x in [exc_3_rev, exc_1_dir, exc_3_dir]:
+        print(len(x))
+
+    for x in exc_3_rev:
+        print(x)
+
+    print('-----')
+    for x in exc_1_dir:
+        print(x)
+
 
 
 
 if __name__ == '__main__':
     run()
+
+
 
