@@ -50,6 +50,7 @@ def run():
         migrations = url_to_run_to_migrations[url][(3, True)]
         print(url + ': ')
         for migration in migrations:
+            migration = migration.ori.url
             parent = get_parent_repo(migration)
             if parent is None:
                 print('' * 32 + migration)

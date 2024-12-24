@@ -69,7 +69,6 @@ def get_parent_repo(url):
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        print(response)
         repo_data = response.json()
         if repo_data.get("fork") and "parent" in repo_data:
             return repo_data["parent"]["html_url"]
