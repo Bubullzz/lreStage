@@ -35,7 +35,7 @@ def run():
     for depth in depths:
         for dir in [False, True]:
             for swhid, url in tqdm.tqdm(l):
-                oris = find_migration(stub, swhid, url, depth, dir, no_snp, no_rev, no_dir)
+                oris = find_migration(stub, swhid, url, depth, dir)
                 url_to_run_to_migrations[url][(depth, dir)] = oris
 
 
@@ -46,26 +46,15 @@ def run():
     urls_1_dir = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(1, True)]) > 1]
     urls_3_dir = [url for url in url_to_run_to_migrations.keys() if len(url_to_run_to_migrations[url][(3, True)]) > 1]
 
-    for x in [urls_1_rev, urls_3_rev, urls_1_dir, urls_3_dir]:
-        print(len(x))
-    
-    exc_3_rev = [url for url in urls_3_rev if url not in urls_1_rev]
-    exc_1_dir = [url for url in urls_1_dir if url not in urls_1_rev]
-    exc_3_dir = [url for url in urls_3_dir if url not in exc_3_rev + exc_1_dir + urls_1_rev]
-
-
-
-    for x in [exc_3_rev, exc_1_dir, exc_3_dir]:
-        print(len(x))
-
-    for x in exc_3_rev:
-        print(x)
-
-    print('-----')
-    for x in exc_1_dir:
-        print(x)
-
-
+    for url in urls_3_dir:
+        migrations = url_to_run_to_migrations[url][(3, True)]
+        print(url + ': ')
+        for migration in migrations:
+            parent = get_parent_repo(migration)
+            if parent is None:
+                print('' * 32 + migration)
+            else:
+                print(' ' * 32 + migration + ' -> ' + parent)
 
 
 if __name__ == '__main__':

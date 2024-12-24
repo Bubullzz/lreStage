@@ -59,3 +59,24 @@ def snapshots(stub, all_origins, only_ids=False, max_depth=1):
     )
     all_snp = stub.Traverse(get_all_snapshots)
     return [snp.swhid for snp in all_snp] if only_ids else list(all_snp)
+
+def get_parent_repo(url):
+    owner = url.split("/")[-2]
+    repo = url.split("/")[-1]
+    url = f"https://api.github.com/repos/{owner}/{repo}"
+
+    headers = {}
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        print(response)
+        repo_data = response.json()
+        if repo_data.get("fork") and "parent" in repo_data:
+            return repo_data["parent"]["html_url"]
+        else:
+            return None
+    else:
+        return None
+    
+
+
