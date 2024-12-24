@@ -53,7 +53,7 @@ def run():
             migration = migration.ori.url
             parent = get_parent_repo(migration)
             if parent is None:
-                print('' * 32 + migration)
+                print(' ' * 32 + migration)
             else:
                 print(' ' * 32 + migration + ' -> ' + parent)
 

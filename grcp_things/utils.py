@@ -73,7 +73,7 @@ def get_parent_repo(url):
         if repo_data.get("fork") and "parent" in repo_data:
             return repo_data["parent"]["html_url"]
         else:
-            return None
+            return "Not a Fork"
     else:
         return None
     
