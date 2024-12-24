@@ -75,7 +75,7 @@ def get_parent_repo(url):
         else:
             return "Not a Fork"
     else:
-        return None
+        return 'Error fetching fork'
     
 
 
