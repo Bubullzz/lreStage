@@ -14,7 +14,6 @@ def sha_read_and_update(file_path, git_to_normal):
         with open(file_path, 'rb') as orc_file:
             table = orc.ORCFile(orc_file).read(['sha1_git', 'sha1'])
             df = table.to_pandas()
-            print(df)
             sha1_git_remaining = [k for k,v in git_to_normal.items() if v == '']
             df = df[df['sha1_git'].isin(sha1_git_remaining)] # Magie noir but fait maison hehe, ça va vraiment optimiser les choses !!!!
             for sha1_git in sha1_git_remaining:
@@ -42,7 +41,7 @@ def swhids_to_sha1(directory_path, swhids, db_dict):
         db_dict = get_orc_as_dict(directory_path)
     return {v: db_dict.get(v.split(':')[3], '') for v in swhids}
 
-async def async_get_file_content_with_retries(sha1, session: aiohttp.ClientSession, semaphore, retries=3):
+async def async_get_file_content_with_retries(sha1, session: aiohttp.ClientSession, semaphore, retries=10):
     try:
         async with semaphore:  # Limit concurrent requests
             timeout = aiohttp.ClientTimeout(total=3)

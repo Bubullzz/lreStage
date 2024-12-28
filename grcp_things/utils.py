@@ -1,10 +1,3 @@
-import chardet
-import sys
-import tqdm
-import grpc
-import math
-import datetime
-import hashlib
 import swhgraph_pb2
 import requests
 import swhgraph_pb2_grpc
@@ -34,21 +27,6 @@ def get_node(stub, swhid):
         )
     return stub.GetNode(req)
 
-def pretty_print_date(date):
-    print(datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S'))
-
-def get_word(stub, all_origins, word):
-    response_iterator = my_traverse_it(stub,all_origins,types="rev")
-    for node in response_iterator:
-        try:
-            if word in node.rev.message.decode('utf-8'):
-                print(node.rev.message.decode('utf-8').replace(word, f'\033[92m{word}\033[0m'))
-                print('---')
-        except UnicodeDecodeError:
-            print("error decoding: ", end='')
-            print(node.rev.message)
-
-
 def snapshots(stub, all_origins, only_ids=False, max_depth=1):
     get_all_snapshots = swhgraph_pb2.TraversalRequest(
         src=all_origins,
@@ -60,22 +38,21 @@ def snapshots(stub, all_origins, only_ids=False, max_depth=1):
     all_snp = stub.Traverse(get_all_snapshots)
     return [snp.swhid for snp in all_snp] if only_ids else list(all_snp)
 
-def get_parent_repo(url):
+def is_fork(url):
     owner = url.split("/")[-2]
     repo = url.split("/")[-1]
     url = f"https://api.github.com/repos/{owner}/{repo}"
-
-    headers = {}
-
+    token = '' # XXX : Add your GitHub token here
+    headers = {"Authorization": f"token {token}"}
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         repo_data = response.json()
         if repo_data.get("fork") and "parent" in repo_data:
-            return repo_data["parent"]["html_url"]
+            return 0 # Explicit Fork
         else:
-            return "Not a Fork"
+            return 1 # Explicit Not a Fork
     else:
-        return 'Error fetching fork'
+        return 2 # Don't know
     
 
 

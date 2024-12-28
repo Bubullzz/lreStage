@@ -41,7 +41,7 @@ def rec_get_files(stub, swhid, name_to_swhid, path, visited, extension):
     if swhid in visited: # Already visited this node
         return
     visited.add(swhid)
-    if any(path.split('.')[-1] == ext for ext in extension): # enough to check it we are on a cnt node
+    if any(path.split('.')[-1] == ext for ext in extension): # enough to check if we are on a cnt node
         name_to_swhid.setdefault(path, set()) # if not exist initialize empty set, then append swhid
         name_to_swhid[path].add(swhid)
         return 
