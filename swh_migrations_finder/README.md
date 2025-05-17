@@ -28,3 +28,7 @@ This will attempt to find all migrations from each given source.
 
 ## GitHub API Integration
 If you want to use GitHub API calls to prune explicit GitHub forks, you need to add a GitHub token in utils.py.
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](./LICENSE) file for details.
